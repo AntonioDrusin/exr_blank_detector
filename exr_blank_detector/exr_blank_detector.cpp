@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <regex>
 #include <string>
 #include "arguments.h"
 #include "ImfRgbaFile.h"
@@ -86,11 +87,40 @@ void wait_for_available_slot(const std::vector<std::future<void>>& futures, size
     }
 }
 
-void analyze_files_recursively(const std::string& folderPath)
+
+std::string dos_wildcard_to_regex(const std::string& wildcard) {
+    std::string regex_str;
+    regex_str.reserve(wildcard.size() * 2);  // Reserve enough space to avoid frequent reallocations
+
+    for (const char ch : wildcard) {
+        switch (ch) {
+        case '*': regex_str += ".*"; break;
+        case '?': regex_str += '.'; break;
+            // Escape special regex characters
+            case '.': case '+': case '\\': case '{': case '}':
+            case '(': case ')': case '[': case ']': case '^': case '$':
+            case '|':
+                regex_str += '\\';
+            regex_str += ch;
+            break;
+        default:
+            regex_str += ch;
+        }
+    }
+
+    return regex_str;
+}
+
+bool string_matches_regex(const std::string& str, const std::string& pattern) {
+    const std::regex re(pattern);
+    return std::regex_match(str, re);
+}
+
+void analyze_files_recursively(const std::string& folder_path, const std::string &wildcard)
 {
-    if (!fs::exists(folderPath) || !fs::is_directory(folderPath))
+    if (!fs::exists(folder_path) || !fs::is_directory(folder_path))
     {
-        std::cerr << "Path is not a valid directory: " << folderPath << std::endl;
+        std::cerr << "Path is not a valid directory: " << folder_path << std::endl;
         return;
     }
 
@@ -99,18 +129,26 @@ void analyze_files_recursively(const std::string& folderPath)
 
     try
     {
-        for (const auto& entry : fs::recursive_directory_iterator(folderPath))
+        for (const auto& entry : fs::recursive_directory_iterator(folder_path))
         {
             //safePrint(entry.path().string());
            
             if (fs::is_regular_file(entry.status()))
             {
                 wait_for_available_slot(futures, max_concurrent_tasks);
+                const auto file_name = entry.path().filename().string();
 
+                if (!wildcard.empty() &&
+                    !string_matches_regex(file_name, dos_wildcard_to_regex(wildcard))
+                    )
+                {
+                    continue;
+                }
+                
                 auto future = std::async(std::launch::async, [entry]()
                 {
                     const auto black = are_all_pixels_black(entry.path().string());
-                    safePrint("result " + entry.path().string() + ": " + (black ? "black" : "not_black"));
+                    safePrint("result|" + entry.path().string() + "|" + (black ? "black" : "not_black"));
                 });
                 
                 futures.push_back(std::move(future));
@@ -158,7 +196,7 @@ int main(const int argc, char* argv[])
     for (const auto& folder : folders)
     {
         std::cerr << "Processing folder: " << folder << std::endl;
-        analyze_files_recursively(folder);
+        analyze_files_recursively(folder, args->get_wildcard());
     }
 
     return 0;
