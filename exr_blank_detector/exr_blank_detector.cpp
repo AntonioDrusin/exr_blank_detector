@@ -91,7 +91,8 @@ void wait_for_available_slot(const std::vector<std::future<void>>& futures, size
 std::string dos_wildcard_to_regex(const std::string& wildcard) {
     std::string regex_str;
     regex_str.reserve(wildcard.size() * 2);  // Reserve enough space to avoid frequent reallocations
-
+    
+    
     for (const char ch : wildcard) {
         switch (ch) {
         case '*': regex_str += ".*"; break;
@@ -112,7 +113,7 @@ std::string dos_wildcard_to_regex(const std::string& wildcard) {
 }
 
 bool string_matches_regex(const std::string& str, const std::string& pattern) {
-    const std::regex re(pattern);
+    const std::regex re(pattern, std::regex_constants::icase);
     return std::regex_match(str, re);
 }
 
