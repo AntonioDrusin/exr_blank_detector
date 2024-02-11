@@ -3,14 +3,14 @@
 ## Copyright Contributors to the OpenEXR Project.
 ##
 
-prefix=C:/Program Files (x86)/OpenEXR
+prefix=D:/dev/AlessandroTests/openexr/Install
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include
-libsuffix=-3_1
+libsuffix=-3_2
 Name: Imath
 Description: Imath library: vector/matrix and math operations, plus the half type.
-Version: 3.1.9
+Version: 3.2.0
 Requires:
 Conflicts:
 Libs: -L${libdir} -lImath${libsuffix}
