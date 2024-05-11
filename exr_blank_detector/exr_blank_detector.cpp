@@ -117,19 +117,19 @@ bool string_matches_regex(const std::string& str, const std::string& pattern) {
     return std::regex_match(str, re);
 }
 
-void analyze_files_recursively(const std::string& folder_path, const std::string &wildcard)
+void analyze_files_recursively(const std::string& folder_path, arguments *args)
 {
     if (!fs::exists(folder_path) || !fs::is_directory(folder_path))
     {
-        std::cerr << "Path is not a valid directory: " << folder_path << std::endl;
+        std::cerr << "Path is not a valid directory: " << folder_path << '\n';
         return;
     }
 
-    std::vector<std::future<void>> futures;
     const size_t max_concurrent_tasks = std::thread::hardware_concurrency();
 
     try
     {
+        std::vector<std::future<void>> futures;
         for (const auto& entry : fs::recursive_directory_iterator(folder_path))
         {
             //safePrint(entry.path().string());
@@ -139,12 +139,36 @@ void analyze_files_recursively(const std::string& folder_path, const std::string
                 wait_for_available_slot(futures, max_concurrent_tasks);
                 const auto file_name = entry.path().filename().string();
 
-                if (!wildcard.empty() &&
-                    !string_matches_regex(file_name, dos_wildcard_to_regex(wildcard))
+                if (!args->get_wildcard().empty() &&
+                    !string_matches_regex(file_name, dos_wildcard_to_regex(args->get_wildcard()))
                     )
                 {
                     continue;
                 }
+
+                std::vector<std::string> skipFiles = args->get_skip_files();
+                bool skip = false;
+                for (const std::string& file_wild_card : skipFiles) {
+                    if ( string_matches_regex(file_name, dos_wildcard_to_regex(file_wild_card)) )
+                    {
+                        skip = true;
+                        break;
+                    }
+                }
+                
+                if ( skip ) continue;
+
+                std::vector<std::string> skip_folders = args->get_skip_folders();
+                const auto path_name = entry.path().parent_path().string();
+                for (const std::string& path_wild_card : skip_folders) {
+                    if ( string_matches_regex(path_name, dos_wildcard_to_regex(path_wild_card)) )
+                    {
+                        skip = true;
+                        break;
+                    }
+                }
+
+                if ( skip ) continue;
                 
                 auto future = std::async(std::launch::async, [entry]()
                 {
@@ -197,7 +221,7 @@ int main(const int argc, char* argv[])
     for (const auto& folder : folders)
     {
         std::cerr << "Processing folder: " << folder << std::endl;
-        analyze_files_recursively(folder, args->get_wildcard());
+        analyze_files_recursively(folder, args);
     }
 
     return 0;
